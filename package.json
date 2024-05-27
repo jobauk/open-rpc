@@ -1,0 +1,21 @@
+{
+  "name": "open-rpc",
+  "module": "lib/index.ts",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "types": "./dist",
+  "scripts": {
+    "build": "bun build ./lib/index.ts --outdir ./dist --minify",
+    "build:types": "tsc --project ./tsconfig.json",
+    "format": "bunx @biomejs/biome format --write ."
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.7.3",
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5.0.0"
+  },
+  "type": "module"
+}
