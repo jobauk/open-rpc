@@ -6,9 +6,9 @@
   "exports": {
     ".": "./dist/index.js"
   },
-  "types": "./dist",
+  "types": "./dist/index.d.ts",
   "scripts": {
-    "build": "bun build ./lib/index.ts --outdir ./dist && bun build:types",
+    "build": "bun build ./lib/index.ts --outdir ./dist --target node && bun build:types",
     "build:types": "tsc --project ./tsconfig.json",
     "format": "bunx @biomejs/biome format --write .",
     "prepublish": "bun run build"
@@ -19,6 +19,5 @@
   },
   "peerDependencies": {
     "typescript": "^5.3.0"
-  },
-  "type": "module"
+  }
 }
