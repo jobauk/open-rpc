@@ -1,5 +1,5 @@
-import type { CreateApiSpec } from "~/type";
-import { ResponseError, ensureError } from "~/utils";
+import type { CreateApiSpec } from "~/lib/type";
+import { ResponseError, ensureError } from "~/lib/utils";
 
 export interface ProxyCallbackOptions {
   path: string[];
@@ -19,7 +19,7 @@ type ProxyCallback = (opts: ProxyCallbackOptions | Request) => unknown;
 
 export type GeneratorOptions = ProxyCallbackOptions[];
 
-type Generator = (opts: GeneratorOptions) => Request;
+export type Generator = (opts: GeneratorOptions) => Request;
 
 const noop = () => {};
 

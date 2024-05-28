@@ -1,0 +1,11 @@
+# node_modules
+node_modules/
+
+# env
+.env.*
+
+lib/
+biome.json
+bunfig.toml
+.gitignore
+tsconfig.json

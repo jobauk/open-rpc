@@ -1,16 +1,17 @@
 {
   "name": "@snuifstuif/open-rpc",
   "module": "lib/index.ts",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "repository": "https://github.com/Snuifstuif/open-rpc",
   "exports": {
     ".": "./dist/index.js"
   },
   "types": "./dist",
   "scripts": {
-    "build": "bun build ./lib/index.ts --outdir ./dist --minify",
+    "build": "bun build ./lib/index.ts --outdir ./dist && bun build:types",
     "build:types": "tsc --project ./tsconfig.json",
-    "format": "bunx @biomejs/biome format --write ."
+    "format": "bunx @biomejs/biome format --write .",
+    "prepublish": "bun run build"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.7.3",

@@ -28,8 +28,8 @@
 
     // Paths
     "paths": {
-      "~/*": ["./lib/*"]
+      "~/*": ["./*"]
     }
   },
-  "include": ["lib/index.ts"]
+  "include": ["lib"]
 }
