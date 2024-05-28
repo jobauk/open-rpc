@@ -176,5 +176,5 @@ dist
 
 .npmrc
 
-./lib/test.ts
-./lib/v3
+lib/test.ts
+lib/v3/
