@@ -194,7 +194,7 @@ type ReplacePathParemeters<T> = Extract<
                 Exclude<ExtractParameterKey<T[K], Param>, null | undefined>
               >
             >,
-          ) => OmitParameterKey<T[K], Param>
+          ) => ReplacePathParemeters<OmitParameterKey<T[K], Param>>
         : T[K] extends (...args: infer P) => infer R
           ? (...args: P) => Promise<ReplacePathParemeters<Awaited<R>>>
           : ReplacePathParemeters<T[K]>;
