@@ -1,5 +1,5 @@
-import type { CreateApiSpec } from "~/lib/type";
-import { ResponseError, ensureError } from "~/lib/utils";
+import type { CreateApiSpec } from "./types";
+import { ResponseError, ensureError } from "./utils";
 
 export interface ProxyCallbackOptions {
   path: string[];
@@ -73,14 +73,11 @@ function createInnerProxy(
         (generators && lastSegment in generators);
 
       if (!isMethod) {
-        const parameter = Object.values(args[0])[0];
+        const parameter = Object.values(args[0]).join("");
         return createInnerProxy(
           callback,
           {
-            path:
-              typeof parameter === "string" || typeof parameter === "number"
-                ? [...opts.path, String(parameter)]
-                : opts.path,
+            path: [...opts.path, parameter],
             args: opts.args,
           },
           generators,
@@ -159,6 +156,13 @@ function createSearchParams(args?: Record<string, unknown>) {
   return `?${params}`;
 }
 
+/**
+ *
+ * @param h1 Base headers.
+ * @param h Array of extra headers to merge.
+ * @returns Merged headers.
+ * @internal
+ */
 function mergeHeaders(h1?: HeadersInit, ...h: (HeadersInit | undefined)[]) {
   const toLowerCaseKeys = (obj: HeadersInit) => {
     return Object.fromEntries(
@@ -207,7 +211,9 @@ async function handleFetch(req: Request): Promise<unknown> {
 }
 
 export const createClient = <
-  ApiSpec extends Record<string, object>,
+  ApiSpec extends {
+    [K in keyof ApiSpec]: ApiSpec[K] extends object ? ApiSpec[K] : never;
+  },
   // biome-ignore lint/complexity/noBannedTypes: <explanation>
   GeneratorSpec extends Record<string | number, unknown> = {},
 >(
@@ -224,7 +230,10 @@ export const createClient = <
       const path = opts.path;
       const args = opts.args;
       const method = path.pop();
-      const fullPath = path.join("/");
+      const fullPath = path
+        .join("/")
+        .replaceAll("/.", ".")
+        .replaceAll("./", ".");
       const params = createSearchParams(args[1]?.$query);
       const uri = `${baseUrl}/${fullPath}${params}`;
 
