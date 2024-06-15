@@ -51,7 +51,7 @@ function createInnerProxy(
         return undefined;
       }
 
-      if (key === "batch") {
+      if (generators && Object.keys(generators).includes(key)) {
         ctx.isGenerator = true;
       }
 
