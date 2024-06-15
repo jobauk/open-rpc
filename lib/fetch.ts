@@ -1,4 +1,4 @@
-import type { CreateApiSpec } from "./types";
+import type { CreateApiSpec, Result } from "./types";
 import { ResponseError, ensureError } from "./utils";
 
 export interface ProxyCallbackOptions {
@@ -192,7 +192,7 @@ function mergeHeaders(h1?: HeadersInit, ...h: (HeadersInit | undefined)[]) {
 }
 
 // TODO: Add response type validation
-async function handleFetch(req: Request): Promise<unknown> {
+async function handleFetch(req: Request): Promise<Result<unknown>> {
   try {
     const res = await fetch(req);
     const data = await res.json();
@@ -202,18 +202,17 @@ async function handleFetch(req: Request): Promise<unknown> {
         context: data,
       });
     }
-    return data;
+    return { success: true, data, error: null };
   } catch (err) {
     const error = ensureError(err);
 
-    throw error;
+    return { success: false, data: null, error };
   }
 }
 
 export const createClient = <
-  ApiSpec extends {
-    [K in keyof ApiSpec]: ApiSpec[K] extends object ? ApiSpec[K] : never;
-  },
+  // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+  ApiSpec extends { [key: string]: any },
   // biome-ignore lint/complexity/noBannedTypes: <explanation>
   GeneratorSpec extends Record<string | number, unknown> = {},
 >(
