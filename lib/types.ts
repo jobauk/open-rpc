@@ -21,15 +21,6 @@ export type Prettify<T> = {
 
 type IsNever<T> = [T] extends [never] ? true : false;
 
-export type RequireExactlyOne<
-  ObjectType,
-  KeysType extends keyof ObjectType = keyof ObjectType,
-> = {
-  [Key in KeysType]: Required<Pick<ObjectType, Key>> &
-    Partial<Record<Exclude<KeysType, Key>, never>>;
-}[KeysType] &
-  Omit<ObjectType, KeysType>;
-
 type UnionToIntersection<Union> = (
   Union extends unknown
     ? (distributedUnion: Union) => void
@@ -97,11 +88,11 @@ export type GetDeep<TObject, TPath extends string> = TObject extends Record<
           : never
   : never;
 
-export type RemoveLeadingSlash<out T extends object> = {
+export type RemoveLeadingSlash<in out T extends object> = {
   [K in keyof T as K extends `/${infer P}` ? P : K]: T[K];
 };
 
-export type PrepareParams<T extends LooseRecord> = {
+export type PrepareParams<in out T extends LooseRecord> = {
   [K in keyof T as K extends `${infer Path}.{${infer Param}}`
     ? `${Path}/./{${Param}}`
     : K extends `${infer Path}.${infer Extension}`
@@ -109,11 +100,7 @@ export type PrepareParams<T extends LooseRecord> = {
       : K]: T[K];
 };
 
-export type CreateHttpMethodReturn<T extends Record<number, unknown>> = Result<
-  Extract<T, `2${number}`>
->;
-
-export type Success<T extends Record<number, unknown>> = {
+export type Success<in out T extends Record<number, unknown>> = {
   [K in keyof T as `${K extends number ? K : never}` extends `2${number}`
     ? K
     : never]: T[K];
@@ -127,38 +114,35 @@ export type CreateHttpMethod<
   Method extends HttpMethod,
   Body,
   Parameters extends Record<string, unknown>,
-  ReturnType extends Record<number, unknown>,
+  ReturnType extends Promise<unknown>,
 > = Method extends "get" | "head" | "options" | "trace"
   ? (options?: {
-      $query?: [Parameters] extends [never]
+      $query?: IsNever<Parameters> extends true
         ? Record<string, unknown>
         : Parameters & Record<string, unknown>;
       $headers?: HeadersInit;
-    }) => Promise<Result<Success<ReturnType>>>
+    }) => ReturnType
   : (
       body?: null | Body,
       options?: {
-        $query?: [Parameters] extends [never]
+        $query?: IsNever<Parameters> extends true
           ? Record<string, unknown>
           : Parameters & Record<string, unknown>;
         $headers?: HeadersInit;
       },
-    ) => Promise<Result<Success<ReturnType>>>;
+    ) => ReturnType;
 
 export type SchemaConfig = {
   bodyTypeKey: string;
   parameterTypeKey: string;
   responseTypeKey: string;
+  responseValueTypeKey: string;
 };
 
-export type Sign<
-  T extends LooseRecord,
-  Config extends SchemaConfig = {
-    bodyTypeKey: `requestBody.content.${string}`;
-    parameterTypeKey: "parameters.query";
-    responseTypeKey: `responses.${number}.content.${string}`;
-  },
-> = Extract<keyof T, `{${string}}`> extends infer Path extends string
+export type Sign<T extends LooseRecord, Config extends SchemaConfig> = Extract<
+  keyof T,
+  `{${string}}`
+> extends infer Path extends string
   ? IsNever<Path> extends true
     ? {
         [K in keyof T]: K extends HttpMethod
@@ -166,11 +150,18 @@ export type Sign<
               K,
               GetDeep<T[K], Config["bodyTypeKey"]>,
               GetDeep<T[K], Config["parameterTypeKey"]>,
-              Prettify<GetDeep<T[K], Config["responseTypeKey"]>>
+              Promise<
+                Result<
+                  GetDeep<
+                    Success<GetDeep<T[K], Config["responseTypeKey"]>>,
+                    Config["responseValueTypeKey"]
+                  >
+                >
+              >
             >
-          : Sign<T[K]>;
+          : Sign<T[K], Config>;
       }
-    : Prettify<Sign<Omit<T, Extract<Path, `{${string}}`>>>> &
+    : Prettify<Sign<Omit<T, Extract<Path, `{${string}}`>>, Config>> &
         UnionToIntersection<
           {
             [K in Path as K extends `{${string}}` ? K : never]: (
@@ -179,11 +170,17 @@ export type Sign<
                   | string
                   | number;
               },
-            ) => Sign<T[K]>; // DO NOT PRETTIFY!
+            ) => Sign<T[K], Config>; // DO NOT PRETTIFY!
           }[Extract<Path, `{${string}}`>]
         >
   : never;
 
-export type CreateApiSpec<T extends object> = Prettify<
-  Sign<Unflatten<PrepareParams<RemoveLeadingSlash<T>>>>
->;
+export type CreateApiSpec<
+  in out T extends object,
+  Config extends SchemaConfig = {
+    bodyTypeKey: `requestBody.content.${string}`;
+    parameterTypeKey: "parameters.query";
+    responseTypeKey: `responses`;
+    responseValueTypeKey: `${number}.content.${string}`;
+  },
+> = Prettify<Sign<Unflatten<PrepareParams<RemoveLeadingSlash<T>>>, Config>>;
