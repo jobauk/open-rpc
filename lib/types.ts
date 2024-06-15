@@ -75,17 +75,19 @@ export type GetDeep<TObject, TPath extends string> = TObject extends Record<
         : never
     : TPath extends keyof TObject
       ? TObject[TPath]
-      : TPath extends `${infer Num extends number}`
-        ? IsNumberLiteral<Num> extends true
-          ? Num extends keyof TObject
-            ? TObject[Num]
+      : TPath extends ""
+        ? TObject
+        : TPath extends `${infer Num extends number}`
+          ? IsNumberLiteral<Num> extends true
+            ? Num extends keyof TObject
+              ? TObject[Num]
+              : never
+            : TObject[Extract<keyof TObject, number>]
+          : TPath extends string
+            ? IsStringLiteral<TPath> extends true
+              ? never
+              : TObject[Extract<keyof TObject, string>]
             : never
-          : TObject[Extract<keyof TObject, number>]
-        : TPath extends string
-          ? IsStringLiteral<TPath> extends true
-            ? never
-            : TObject[Extract<keyof TObject, string>]
-          : never
   : never;
 
 export type RemoveLeadingSlash<in out T extends object> = {
@@ -177,10 +179,5 @@ export type Sign<T extends LooseRecord, Config extends SchemaConfig> = Extract<
 
 export type CreateApiSpec<
   in out T extends object,
-  Config extends SchemaConfig = {
-    bodyTypeKey: `requestBody.content.${string}`;
-    parameterTypeKey: "parameters.query";
-    responseTypeKey: `responses`;
-    responseValueTypeKey: `${number}.content.${string}`;
-  },
+  Config extends SchemaConfig,
 > = Prettify<Sign<Unflatten<PrepareParams<RemoveLeadingSlash<T>>>, Config>>;
