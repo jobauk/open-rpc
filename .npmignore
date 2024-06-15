@@ -5,7 +5,9 @@ node_modules/
 .env.*
 
 lib/
+test/
 biome.json
 bunfig.toml
 .gitignore
 tsconfig.json
+tsconfig.test.json

@@ -24,12 +24,7 @@
     // Some stricter flags
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    "noPropertyAccessFromIndexSignature": true,
-
-    // Paths
-    "paths": {
-      "~/*": ["./*"]
-    }
+    "noPropertyAccessFromIndexSignature": true
   },
   "include": ["lib"]
 }
