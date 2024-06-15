@@ -1,4 +1,4 @@
-import type { CreateApiSpec, Result } from "./types";
+import type { CreateApiSpec, Result, SchemaConfig } from "./types";
 import { ResponseError, ensureError } from "./utils";
 
 export interface ProxyCallbackOptions {
@@ -213,6 +213,7 @@ async function handleFetch(req: Request): Promise<Result<unknown>> {
 export const createClient = <
   // biome-ignore lint/suspicious/noExplicitAny: <explanation>
   ApiSpec extends { [key: string]: any },
+  Config extends SchemaConfig,
   // biome-ignore lint/complexity/noBannedTypes: <explanation>
   GeneratorSpec extends Record<string | number, unknown> = {},
 >(
@@ -252,4 +253,4 @@ export const createClient = <
     }
 
     return handleFetch(req);
-  }, generators) as CreateApiSpec<ApiSpec> & GeneratorSpec;
+  }, generators) as CreateApiSpec<ApiSpec, Config> & GeneratorSpec;
