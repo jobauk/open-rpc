@@ -21,6 +21,14 @@ export type Prettify<T> = {
 
 type IsNever<T> = [T] extends [never] ? true : false;
 
+export type IsNull<T> = [T] extends [null] ? true : false;
+
+export type IsUnknown<T> = unknown extends T // `T` can be `unknown` or `any`
+  ? IsNull<T> extends false // `any` can be `null`, but `unknown` can't be
+    ? true
+    : false
+  : false;
+
 type UnionToIntersection<Union> = (
   Union extends unknown
     ? (distributedUnion: Union) => void
@@ -141,10 +149,82 @@ export type SchemaConfig = {
   responseValueTypeKey: string;
 };
 
-export type Sign<T extends LooseRecord, Config extends SchemaConfig> = Extract<
-  keyof T,
-  `{${string}}`
-> extends infer Path extends string
+export type UnknownData = unknown & { __brand: "UnknownData" };
+
+type Join<K, P> = K extends string | number
+  ? P extends string | number
+    ? `${K}.${P}`
+    : never
+  : never;
+
+type Decrement<N extends number> = [never, 0, 1, 2, 3, 4][N];
+
+type PrivatePathToUnknownData<
+  T,
+  Key extends keyof T = keyof T,
+  Depth extends number = 5,
+> = Depth extends 0
+  ? never
+  : T extends UnknownData
+    ? null
+    : Key extends keyof T
+      ? Extract<T[Key], UnknownData> extends never
+        ? Join<
+            Key,
+            PrivatePathToUnknownData<
+              NonNullable<T[Key]>,
+              keyof NonNullable<T[Key]>,
+              Decrement<Depth>
+            >
+          >
+        : Key
+      : never;
+
+export type PathToUnknownData<T> = PrivatePathToUnknownData<T> extends infer P
+  ? P extends string
+    ? P
+    : IsNull<P> extends true
+      ? null
+      : never
+  : never;
+
+export type ReplaceDeep<
+  T,
+  Path extends string | null,
+  Value,
+  Depth extends number = 5,
+> = Depth extends 0
+  ? T
+  : IsNever<Path> extends true
+    ? T
+    : IsNull<Path> extends true
+      ? Value
+      : Path extends `${infer Key}.${infer Rest}`
+        ? {
+            [K in keyof T]: K extends Key
+              ?
+                  | ReplaceDeep<
+                      NonNullable<T[K]>,
+                      Rest,
+                      Value,
+                      Decrement<Depth>
+                    >
+                  | Extract<T[K], null>
+              : T[K];
+          }
+        : Path extends `${infer Key}`
+          ? {
+              [K in keyof T]: K extends Key
+                ? Exclude<T[K], UnknownData> | Value
+                : T[K];
+            }
+          : never;
+
+export type Sign<
+  T extends LooseRecord,
+  Config extends SchemaConfig,
+  TReturn,
+> = Extract<keyof T, `{${string}}`> extends infer Path extends string
   ? IsNever<Path> extends true
     ? {
         [K in keyof T]: K extends HttpMethod
@@ -153,17 +233,26 @@ export type Sign<T extends LooseRecord, Config extends SchemaConfig> = Extract<
               GetDeep<T[K], Config["bodyTypeKey"]>,
               GetDeep<T[K], Config["parameterTypeKey"]>,
               Promise<
-                Result<
-                  GetDeep<
-                    Success<GetDeep<T[K], Config["responseTypeKey"]>>,
-                    Config["responseValueTypeKey"]
-                  >
-                >
+                IsNever<TReturn> extends true
+                  ? Result<
+                      GetDeep<
+                        Success<GetDeep<T[K], Config["responseTypeKey"]>>,
+                        Config["responseValueTypeKey"]
+                      >
+                    >
+                  : ReplaceDeep<
+                      TReturn,
+                      PathToUnknownData<TReturn>,
+                      GetDeep<
+                        Success<GetDeep<T[K], Config["responseTypeKey"]>>,
+                        Config["responseValueTypeKey"]
+                      >
+                    >
               >
             >
-          : Sign<T[K], Config>;
+          : Sign<T[K], Config, TReturn>;
       }
-    : Prettify<Sign<Omit<T, Extract<Path, `{${string}}`>>, Config>> &
+    : Prettify<Sign<Omit<T, Extract<Path, `{${string}}`>>, Config, TReturn>> &
         UnionToIntersection<
           {
             [K in Path as K extends `{${string}}` ? K : never]: (
@@ -172,7 +261,7 @@ export type Sign<T extends LooseRecord, Config extends SchemaConfig> = Extract<
                   | string
                   | number;
               },
-            ) => Sign<T[K], Config>; // DO NOT PRETTIFY!
+            ) => Sign<T[K], Config, TReturn>; // DO NOT PRETTIFY!
           }[Extract<Path, `{${string}}`>]
         >
   : never;
@@ -180,4 +269,7 @@ export type Sign<T extends LooseRecord, Config extends SchemaConfig> = Extract<
 export type CreateApiSpec<
   in out T extends object,
   Config extends SchemaConfig,
-> = Prettify<Sign<Unflatten<PrepareParams<RemoveLeadingSlash<T>>>, Config>>;
+  TReturn,
+> = Prettify<
+  Sign<Unflatten<PrepareParams<RemoveLeadingSlash<T>>>, Config, TReturn>
+>;

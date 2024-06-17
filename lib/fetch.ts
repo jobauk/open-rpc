@@ -1,4 +1,4 @@
-import type { CreateApiSpec, Result, SchemaConfig } from "./types";
+import type { CreateApiSpec, Result, SchemaConfig, UnknownData } from "./types";
 import { ResponseError, ensureError } from "./utils";
 
 export interface ProxyCallbackOptions {
@@ -210,52 +210,68 @@ async function handleFetch(req: Request): Promise<Result<unknown>> {
   }
 }
 
-export const createClient = <
-  // biome-ignore lint/suspicious/noExplicitAny: <explanation>
-  ApiSpec extends { [key: string]: any },
-  Config extends SchemaConfig = {
-    bodyTypeKey: `requestBody.content.${string}`;
-    parameterTypeKey: "parameters.query";
-    responseTypeKey: `responses`;
-    responseValueTypeKey: `${number}.content.${string}`;
-  },
-  // biome-ignore lint/complexity/noBannedTypes: <explanation>
-  GeneratorSpec extends Record<string | number, unknown> = {},
->(
-  baseUrl: string,
-  init?: RequestInit | null,
-  generators?: Record<string, Generator>,
-) =>
-  createRecursiveProxy(async (opts) => {
-    let req: Request;
+type Middleware = {
+  onResponse?: (res: Result<UnknownData>) => unknown;
+};
 
-    if (opts instanceof Request) {
-      req = new Request(opts, { ...init });
-    } else {
-      const path = opts.path;
-      const args = opts.args;
-      const method = path.pop();
-      const fullPath = path
-        .join("/")
-        .replaceAll("/.", ".")
-        .replaceAll("./", ".");
-      const params = createSearchParams(args[1]?.$query);
-      const uri = `${baseUrl}/${fullPath}${params}`;
+export const createClient =
+  <
+    // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+    ApiSpec extends { [key: string]: any },
+    TConfig extends SchemaConfig = {
+      bodyTypeKey: `requestBody.content.${string}`;
+      parameterTypeKey: "parameters.query";
+      responseTypeKey: `responses`;
+      responseValueTypeKey: `${number}.content.${string}`;
+    },
+    // biome-ignore lint/complexity/noBannedTypes: <explanation>
+    TExtended extends Record<string | number, unknown> = {},
+  >() =>
+  <TMiddleware extends Middleware>(
+    baseUrl: string,
+    options?: {
+      init?: RequestInit;
+      middleware?: TMiddleware;
+      generators?: Record<string, Generator>;
+    },
+  ) =>
+    createRecursiveProxy(async (opts) => {
+      let req: Request;
 
-      const body = args[0] ? JSON.stringify(args[0]) : null;
-      const headers = args[1]?.$headers;
+      if (opts instanceof Request) {
+        req = new Request(opts, { ...options?.init });
+      } else {
+        const path = opts.path;
+        const args = opts.args;
+        const method = path.pop();
+        const fullPath = path
+          .join("/")
+          .replaceAll("/.", ".")
+          .replaceAll("./", ".");
+        const params = createSearchParams(args[1]?.$query);
+        const uri = `${baseUrl}/${fullPath}${params}`;
 
-      req = new Request(uri, {
-        ...init,
-        method,
-        body,
-        headers: mergeHeaders(
-          init?.headers,
-          [["content-type", "application/json"]],
-          headers,
-        ),
-      });
-    }
+        const body = args[0] ? JSON.stringify(args[0]) : null;
+        const headers = args[1]?.$headers;
 
-    return handleFetch(req);
-  }, generators) as CreateApiSpec<ApiSpec, Config> & GeneratorSpec;
+        req = new Request(uri, {
+          ...options?.init,
+          method,
+          body,
+          headers: mergeHeaders(
+            options?.init?.headers,
+            [["content-type", "application/json"]],
+            headers,
+          ),
+        });
+      }
+
+      return handleFetch(req);
+    }, options?.generators) as CreateApiSpec<
+      ApiSpec,
+      TConfig,
+      Extract<TMiddleware["onResponse"], undefined> extends never
+        ? ReturnType<Exclude<TMiddleware["onResponse"], undefined>>
+        : never
+    > &
+      TExtended;
