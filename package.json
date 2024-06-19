@@ -1,7 +1,7 @@
 {
   "name": "@snuifstuif/open-rpc",
   "main": "dist/index.js",
-  "version": "0.2.6",
+  "version": "0.2.8",
   "repository": "https://github.com/Snuifstuif/open-rpc",
   "exports": {
     ".": "./dist/index.js"

@@ -5,7 +5,7 @@ node_modules/
 .env.*
 
 lib/
-test/
+tests/
 biome.json
 bunfig.toml
 .gitignore
