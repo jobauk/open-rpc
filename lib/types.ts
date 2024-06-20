@@ -69,45 +69,73 @@ type LiteralCheck<T, LiteralType extends Primitive> = IsNever<T> extends false
 type IsStringLiteral<T> = LiteralCheck<T, string>;
 type IsNumberLiteral<T> = LiteralCheck<T, number>;
 
-export type GetDeep<TObject, TPath extends string> = TObject extends Record<
-  string | number,
-  unknown
->
-  ? TPath extends `${infer TPrefix}.${infer TSuffix}`
-    ? TPrefix extends keyof TObject
-      ? GetDeep<TObject[TPrefix], TSuffix>
-      : TPrefix extends `${number}`
-        ? IsNumberLiteral<TPrefix> extends true
-          ? never
-          : GetDeep<TObject[Extract<keyof TObject, number>], TSuffix>
-        : never
-    : TPath extends keyof TObject
-      ? TObject[TPath]
-      : TPath extends ""
-        ? TObject
-        : TPath extends `${infer Num extends number}`
-          ? IsNumberLiteral<Num> extends true
-            ? Num extends keyof TObject
-              ? TObject[Num]
+type PrivateGetDeep<
+  TObject,
+  TPath extends string,
+  Depth extends number = 15,
+> = Depth extends 0
+  ? never
+  : TObject extends Record<string | number, unknown>
+    ? TPath extends `${infer TPrefix}/${infer TSuffix}`
+      ? TPrefix extends keyof TObject
+        ? PrivateGetDeep<TObject[TPrefix], TSuffix, Decrement<Depth>>
+        : TPrefix extends `${number}`
+          ? IsNumberLiteral<TPrefix> extends true
+            ? never
+            : PrivateGetDeep<
+                TObject[Extract<keyof TObject, number>],
+                TSuffix,
+                Decrement<Depth>
+              >
+          : never
+      : TPath extends keyof TObject
+        ? TObject[TPath]
+        : TPath extends ""
+          ? TObject
+          : TPath extends `${infer Num extends number}`
+            ? IsNumberLiteral<Num> extends true
+              ? Num extends keyof TObject
+                ? TObject[Num]
+                : never
+              : TObject[Extract<keyof TObject, number>]
+            : TPath extends string
+              ? IsStringLiteral<TPath> extends true
+                ? never
+                : TObject[Extract<keyof TObject, string>]
               : never
-            : TObject[Extract<keyof TObject, number>]
-          : TPath extends string
-            ? IsStringLiteral<TPath> extends true
-              ? never
-              : TObject[Extract<keyof TObject, string>]
-            : never
-  : never;
+    : never;
+
+export type GetDeep<TObject, TPath extends string> = PrivateGetDeep<
+  TObject,
+  TPath
+>;
 
 export type RemoveLeadingSlash<in out T extends object> = {
   [K in keyof T as K extends `/${infer P}` ? P : K]: T[K];
 };
 
-export type PrepareParams<in out T extends LooseRecord> = {
-  [K in keyof T as K extends `${infer Path}.{${infer Param}}`
-    ? `${Path}/./{${Param}}`
-    : K extends `${infer Path}.${infer Extension}`
-      ? `${Path}/.${Extension}`
-      : K]: T[K];
+type CreateParam<
+  T extends string,
+  Delimiter extends string,
+> = T extends `${infer Operator}${Delimiter}{${infer Param}}${infer Modifier extends "*" | ""}`
+  ? `${Operator}${Operator extends "" ? "" : "/"}~${Delimiter}${Modifier}/{${Param}}`
+  : T extends `${infer Head}${Delimiter}${infer Tail}`
+    ? `${Head}/~${Delimiter}/${Tail}`
+    : T;
+
+export type CreateMaybeParam<T extends string> = T extends `${string}.${string}`
+  ? CreateParam<T, ".">
+  : T extends `${string};${string}`
+    ? CreateParam<T, ";">
+    : T;
+
+export type TransformPath<T extends string> =
+  T extends `${infer Segment}/${infer Rest}`
+    ? `${CreateMaybeParam<Segment>}/${TransformPath<Rest>}`
+    : CreateMaybeParam<T>;
+
+export type PrepareParams<in out T extends Record<string, unknown>> = {
+  [K in keyof T as K extends string ? TransformPath<K> : never]: T[K];
 };
 
 export type Success<in out T extends Record<number, unknown>> = {
@@ -144,7 +172,8 @@ export type CreateHttpMethod<
 
 export type SchemaConfig = {
   bodyTypeKey: string;
-  parameterTypeKey: string;
+  searchParameterTypeKey: string;
+  pathParameterTypeKey: string;
   responseTypeKey: string;
   responseValueTypeKey: string;
 };
@@ -157,7 +186,32 @@ type Join<K, P> = K extends string | number
     : never
   : never;
 
-type Decrement<N extends number> = [never, 0, 1, 2, 3, 4][N];
+type Decrement<N extends number> = [
+  never,
+  0,
+  1,
+  2,
+  3,
+  4,
+  5,
+  6,
+  7,
+  8,
+  9,
+  10,
+  11,
+  12,
+  13,
+  14,
+][N];
+
+type FindPathToKey<T, K extends string> = K extends keyof T
+  ? Extract<keyof T, K>
+  : T extends object
+    ? {
+        [P in Exclude<keyof T, K>]: `${P & string}/${FindPathToKey<T[P], K>}`;
+      }[Exclude<keyof T, K>]
+    : never;
 
 type PrivatePathToUnknownData<
   T,
@@ -231,7 +285,7 @@ export type Sign<
           ? CreateHttpMethod<
               K,
               GetDeep<T[K], Config["bodyTypeKey"]>,
-              GetDeep<T[K], Config["parameterTypeKey"]>,
+              GetDeep<T[K], Config["searchParameterTypeKey"]>,
               Promise<
                 IsNever<TReturn> extends true
                   ? Result<
@@ -256,11 +310,17 @@ export type Sign<
         UnionToIntersection<
           {
             [K in Path as K extends `{${string}}` ? K : never]: (
-              params: {
-                [param in K extends `{${infer Param}}` ? Param : never]:
-                  | string
-                  | number;
-              },
+              params: K extends `{${infer Param}}`
+                ? Prettify<
+                    Pick<
+                      GetDeep<
+                        T[K],
+                        `${FindPathToKey<T[K], HttpMethod>}/${Config["pathParameterTypeKey"]}`
+                      >,
+                      Param
+                    >
+                  >
+                : never,
             ) => Sign<T[K], Config, TReturn>; // DO NOT PRETTIFY!
           }[Extract<Path, `{${string}}`>]
         >
