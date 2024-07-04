@@ -1,6 +1,13 @@
-type Jsonable =
+import {
+  isPrimitive,
+  isPrimitivesArray,
+  isPrimitivesObject,
+} from "./serialize";
+
+export type Jsonable =
   | string
   | number
+  | bigint
   | boolean
   | null
   | undefined
@@ -8,7 +15,32 @@ type Jsonable =
   | { readonly [key: string]: Jsonable }
   | { toJSON(): Jsonable };
 
-type ErrorOptions = { cause?: Error; context?: Jsonable };
+export function isJsonable(value: unknown): value is Jsonable {
+  if (isPrimitive(value)) {
+    return true;
+  }
+
+  if (isPrimitivesArray(value)) {
+    return true;
+  }
+
+  if (isPrimitivesObject(value)) {
+    return true;
+  }
+
+  if (
+    value &&
+    typeof value === "object" &&
+    Object.hasOwn(value, "toJSON") &&
+    typeof (value as { toJSON(): Jsonable }).toJSON === "function"
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+export type ErrorOptions = { cause?: Error; context?: Jsonable };
 
 export class BaseError extends Error {
   public readonly context?: Jsonable;

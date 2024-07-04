@@ -1,29 +1,19 @@
-import type { CreateApiSpec, Result, SchemaConfig, UnknownData } from "./types";
-import { ResponseError, ensureError } from "./utils";
-
-export interface ProxyCallbackOptions {
-  path: string[];
-  args: [
-    null | undefined | BodyInit,
-    (
-      | {
-          $query?: Record<string, unknown>;
-          $headers?: Record<string, string>;
-        }
-      | undefined
-    ),
-  ];
-}
-
-type ProxyCallback = (opts: ProxyCallbackOptions | Request) => unknown;
-
-export type GeneratorOptions = ProxyCallbackOptions[];
-
-export type Generator = (opts: GeneratorOptions) => Request;
+import { serializePath, serializeSearchParams } from "./serialize";
+import type {
+  Data,
+  Format,
+  Generator,
+  Middleware,
+  ProxyCallback,
+  ProxyCallbackOptions,
+  Result,
+} from "./types";
+import { unwrapResponse } from "./unwrap";
+import { ResponseError, ensureError, isJsonable } from "./utils";
 
 const noop = () => {};
 
-const methods = [
+export const methods = [
   "get",
   "put",
   "post",
@@ -33,6 +23,8 @@ const methods = [
   "patch",
   "trace",
 ];
+
+export const methodsWithoutBody = ["get", "head", "options", "trace"];
 
 function createInnerProxy(
   callback: ProxyCallback,
@@ -69,15 +61,16 @@ function createInnerProxy(
       const isApply = opts.path[opts.path.length - 1] === "apply";
       const lastSegment = opts.path[opts.path.length - (isApply ? 2 : 1)];
       const isMethod =
-        methods.includes(lastSegment) ||
-        (generators && lastSegment in generators);
+        (typeof lastSegment === "string" && methods.includes(lastSegment)) ||
+        (generators &&
+          typeof lastSegment === "string" &&
+          lastSegment in generators);
 
       if (!isMethod) {
-        const parameter = Object.values(args[0]).join("");
         return createInnerProxy(
           callback,
           {
-            path: [...opts.path, parameter],
+            path: [...opts.path, args[0]],
             args: opts.args,
           },
           generators,
@@ -86,19 +79,22 @@ function createInnerProxy(
       }
 
       if (generators?.[lastSegment]) {
-        const _generatorOps = ctx.generatorOpts;
+        const _generatorOpts = ctx.generatorOpts;
         // Cleanup
         ctx.isGenerator = false;
         ctx.generatorOpts = [];
-        return callback(generators?.[lastSegment](_generatorOps));
+        return callback(generators?.[lastSegment](_generatorOpts));
       }
 
       if (ctx.isGenerator) {
         return ctx.generatorOpts.push(opts);
       }
 
+      const _args = isApply ? (args.length >= 2 ? args[1] : []) : args;
       return callback({
-        args: isApply ? (args.length >= 2 ? args[1] : []) : args,
+        args: methodsWithoutBody.includes(lastSegment)
+          ? [null, ..._args]
+          : _args,
         path: isApply ? opts.path.slice(0, -1) : opts.path,
       });
     },
@@ -125,36 +121,6 @@ const createRecursiveProxy = (
     generators,
     { isGenerator: false, generatorOpts: [] },
   );
-
-function createSearchParams(args?: Record<string, unknown>) {
-  if (!args) {
-    return "";
-  }
-
-  const params = new URLSearchParams();
-  for (const key in args) {
-    const value = args[key];
-    switch (typeof value) {
-      case "number":
-      case "string":
-      case "boolean":
-        params.append(key, String(value));
-        break;
-      case "object":
-        if (
-          Array.isArray(value) &&
-          value.every((value) => typeof value === "string" || "number")
-        ) {
-          params.append(key, value.join(","));
-        } else {
-          params.append(key, JSON.stringify(value));
-        }
-        break;
-    }
-  }
-
-  return `?${params}`;
-}
 
 /**
  *
@@ -192,14 +158,15 @@ function mergeHeaders(h1?: HeadersInit, ...h: (HeadersInit | undefined)[]) {
 }
 
 // TODO: Add response type validation
-async function handleFetch(req: Request): Promise<Result<unknown>> {
+async function handleFetch(req: Request) {
   try {
     const res = await fetch(req);
-    const data = await res.json();
+    const data = await unwrapResponse(res);
+    const context = isJsonable(data) ? data : null;
     if (!res.ok) {
       throw new ResponseError(res.statusText, {
         response: res,
-        context: data,
+        context,
       });
     }
     return { success: true, data, error: null };
@@ -210,32 +177,22 @@ async function handleFetch(req: Request): Promise<Result<unknown>> {
   }
 }
 
-type Middleware = {
-  onResponse?: (res: Result<UnknownData>) => unknown;
-};
-
 export const createClient =
   <
     // biome-ignore lint/suspicious/noExplicitAny: <explanation>
     ApiSpec extends { [key: string]: any },
-    TConfig extends SchemaConfig = {
-      bodyTypeKey: `requestBody.content.${string}`;
-      parameterTypeKey: "parameters.query";
-      responseTypeKey: `responses`;
-      responseValueTypeKey: `${number}.content.${string}`;
-    },
     // biome-ignore lint/complexity/noBannedTypes: <explanation>
     TExtended extends Record<string | number, unknown> = {},
-  >() =>
-  <TMiddleware extends Middleware>(
+  >(
     baseUrl: string,
-    options?: {
-      init?: RequestInit;
-      middleware?: TMiddleware;
-      generators?: Record<string, Generator>;
-    },
   ) =>
+  <TMiddleware extends Middleware>(options?: {
+    init?: RequestInit;
+    middleware?: TMiddleware;
+    generators?: Record<string, Generator>;
+  }) =>
     createRecursiveProxy(async (opts) => {
+      const _baseUrl = baseUrl.endsWith("/") ? baseUrl.slice(0, -1) : baseUrl;
       let req: Request;
 
       if (opts instanceof Request) {
@@ -243,14 +200,11 @@ export const createClient =
       } else {
         const path = opts.path;
         const args = opts.args;
-        const method = path.pop();
-        const fullPath = path
-          .join("/")
-          .replaceAll("/.", ".")
-          .replaceAll("./", ".");
-        const params = createSearchParams(args[1]?.$query);
-        const uri = `${baseUrl}/${fullPath}${params}`;
+        const method = path.pop() as string;
+        const fullPath = serializePath(path);
 
+        const params = serializeSearchParams(args[1]?.$query);
+        const uri = `${_baseUrl}${fullPath}${params}`;
         const body = args[0] ? JSON.stringify(args[0]) : null;
         const headers = args[1]?.$headers;
 
@@ -266,12 +220,18 @@ export const createClient =
         });
       }
 
-      return handleFetch(req);
-    }, options?.generators) as CreateApiSpec<
+      const response = await handleFetch(req);
+      if (options?.middleware?.onResponse) {
+        return options.middleware.onResponse(response as Result<Data>, {
+          baseUrl,
+          init: options?.init,
+        });
+      }
+      return response;
+    }, options?.generators) as Format<
       ApiSpec,
-      TConfig,
       Extract<TMiddleware["onResponse"], undefined> extends never
         ? ReturnType<Exclude<TMiddleware["onResponse"], undefined>>
-        : never
+        : Result<Data>
     > &
       TExtended;
