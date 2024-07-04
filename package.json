@@ -1,8 +1,9 @@
 {
   "name": "@snuifstuif/open-rpc",
-  "main": "dist/index.js",
-  "version": "0.2.8",
+  "version": "0.2.9",
   "repository": "https://github.com/Snuifstuif/open-rpc",
+  "bin": "bin/cli.js",
+  "main": "dist/index.js",
   "exports": {
     ".": "./dist/index.js"
   },
@@ -21,5 +22,8 @@
   },
   "peerDependencies": {
     "typescript": "^5.3.0"
+  },
+  "dependencies": {
+    "openapi-typescript": "^7.0.0"
   }
 }
