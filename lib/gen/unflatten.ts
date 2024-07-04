@@ -277,8 +277,6 @@ export function unflatten(
     }
   }
 
-  fs.writeFileSync(`${__dirname}/tree.json`, JSON.stringify(tree, null, 4));
-
   const buildProperties = (
     tree: Record<
       string,
