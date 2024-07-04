@@ -1,6 +1,6 @@
 {
   "name": "@snuifstuif/open-rpc",
-  "version": "0.2.9",
+  "version": "0.3.0",
   "repository": "https://github.com/Snuifstuif/open-rpc",
   "bin": "bin/cli.js",
   "main": "dist/index.js",
@@ -9,7 +9,7 @@
   },
   "types": "./dist/index.d.ts",
   "scripts": {
-    "build": "bun build ./lib/index.ts --outdir ./dist --target node && bun build:types",
+    "build": "bun build --entrypoints ./lib/fetch/client.ts ./lib/gen/index.ts --outdir ./dist --target node && bun build:types",
     "build:types": "tsc --project ./tsconfig.json",
     "format": "bunx @biomejs/biome format --write .",
     "prepublish": "bun run build",

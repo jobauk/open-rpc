@@ -6,6 +6,7 @@ node_modules/
 
 lib/
 tests/
+type-tests/
 biome.json
 bunfig.toml
 .gitignore

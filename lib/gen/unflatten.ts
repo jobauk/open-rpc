@@ -1,6 +1,5 @@
-import fs from "node:fs";
 import ts from "typescript";
-import { methods, methodsWithoutBody } from "../fetch/client";
+import { methods, methodsWithoutBody } from "../../src/fetch/client";
 import type { Operation } from "./get-operations";
 
 function createParameterFunctionNode(key: string, type: ts.TypeNode) {

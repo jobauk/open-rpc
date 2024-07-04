@@ -196,5 +196,3 @@ export function serializeSearchParams(args?: Record<string, unknown>) {
 
   return `?${searchParams}`;
 }
-
-function serializeBody() {}
