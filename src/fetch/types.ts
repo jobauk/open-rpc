@@ -55,8 +55,8 @@ export type Result<T> =
   | { success: true; data: T; error: null }
   | { success: false; data: null; error: ResponseError };
 
-declare const brand: unique symbol;
-export type Branded<T, U> = T & { [brand]: U };
+export declare const brand: unique symbol;
+export type Branded<T, U> = T & { [k in typeof brand]: U };
 
 export type Data = Branded<unknown, "data">;
 
@@ -64,9 +64,11 @@ type FormatResponse<T, D> = T extends Data
   ? D
   : T extends ResponseError
     ? ResponseError
-    : {
-        [K in keyof T]: FormatResponse<T[K], D>;
-      };
+    : T extends object
+      ? {
+          [K in keyof T]: FormatResponse<T[K], D>;
+        }
+      : T;
 
 export type UnionToIntersection<Union> = (
   Union extends unknown
