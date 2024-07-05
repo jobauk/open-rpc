@@ -85,10 +85,12 @@ export type Format<T, ResponseFormat> = T extends (
   ...args: infer P
 ) => Promise<infer D>
   ? P extends [body?: infer Body, options?: infer Options]
-    ? (
-        body?: Body,
-        options?: Options,
-      ) => Promise<FormatResponse<ResponseFormat, D>>
+    ? unknown extends Options
+      ? (options?: P[0]) => Promise<FormatResponse<ResponseFormat, D>>
+      : (
+          body?: Body,
+          options?: Options,
+        ) => Promise<FormatResponse<ResponseFormat, D>>
     : (options?: P[0]) => Promise<FormatResponse<ResponseFormat, D>>
   : T extends (...args: infer P) => infer R
     ? (params: P[0]) => Format<R, ResponseFormat>

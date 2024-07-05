@@ -1,6 +1,6 @@
 {
   "name": "@snuifstuif/open-rpc",
-  "version": "0.3.1",
+  "version": "0.3.3",
   "repository": "https://github.com/Snuifstuif/open-rpc",
   "bin": "bin/cli.js",
   "main": "dist/src/index.js",
