@@ -184,7 +184,7 @@ export function getOperationTypes(ast: ts.Node[]) {
           for (const member of node.members) {
             if (
               ts.isPropertySignature(member) &&
-              ts.isIdentifier(member.name) &&
+              !ts.isComputedPropertyName(member.name) &&
               member.type &&
               ts.isTypeLiteralNode(member.type)
             ) {
