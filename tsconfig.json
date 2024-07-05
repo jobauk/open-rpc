@@ -26,5 +26,5 @@
     "noUnusedParameters": true,
     "noPropertyAccessFromIndexSignature": true
   },
-  "include": ["lib", "src/fetch"]
+  "include": ["lib", "src"]
 }

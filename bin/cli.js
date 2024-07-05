@@ -1,6 +1,14 @@
 #!/usr/bin/env node
 
-import { generate } from "../lib/gen";
+const path = require("node:path");
+const { generate } = require(path.join(__dirname, "../dist/lib/index.js"));
+
+if (process.argv.length <= 2) {
+  console.error(
+    'Please provide a valid input and output argument. e.g. "https://my-api.com/open-api.json -o types/types.gen.ts"',
+  );
+  process.exit();
+}
 
 const openApiUrl = process.argv[2];
 const output = process.argv[4].split("/");
@@ -19,10 +27,6 @@ if (!outputFile.endsWith(".ts")) {
 
 console.log("Generating...");
 
-try {
-  console.log(outputDir, outputFile);
-  await generate(openApiUrl, outputDir, outputFile);
-  console.log(`Successfully generated at: ${process.argv[4]}`);
-} catch (error) {
-  console.error(error);
-}
+generate(openApiUrl, outputDir, outputFile)
+  .then(() => console.log(`Successfully generated at: ${process.argv[4]}`))
+  .catch((error) => console.error(error));

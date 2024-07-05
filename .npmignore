@@ -5,6 +5,7 @@ node_modules/
 .env.*
 
 lib/
+src/
 tests/
 type-tests/
 biome.json
