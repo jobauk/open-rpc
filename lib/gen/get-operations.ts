@@ -61,7 +61,9 @@ function mapOperation(type: ts.TypeLiteralNode) {
       ts.factory.createIdentifier("Record"),
       [
         ts.factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
-        ts.factory.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword),
+        ts.factory.createTypeReferenceNode(
+          ts.factory.createIdentifier("Jsonable"),
+        ),
       ],
     ),
     headers: ts.factory.createTypeReferenceNode(
@@ -112,7 +114,24 @@ function mapOperation(type: ts.TypeLiteralNode) {
       const cookies = findProperty(member.type.members, "cookie");
 
       if (query) {
-        operation.query = query;
+        operation.query = ts.factory.createTypeLiteralNode([
+          ts.factory.createIndexSignature(
+            undefined,
+            [
+              ts.factory.createParameterDeclaration(
+                undefined,
+                undefined,
+                ts.factory.createIdentifier("key"),
+                undefined,
+                ts.factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
+              ),
+            ],
+            ts.factory.createTypeReferenceNode(
+              ts.factory.createIdentifier("Jsonable"),
+            ),
+          ),
+          ...query.members,
+        ]);
       }
 
       if (headers) {

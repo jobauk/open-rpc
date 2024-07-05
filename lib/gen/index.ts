@@ -66,6 +66,17 @@ export async function generate(input: string, dir: string, fileName: string) {
   const processed = ts.transform(ast, [transformer]);
   const contents = astToString(processed.transformed);
 
+  const header = `type Jsonable =
+  | string
+  | number
+  | bigint
+  | boolean
+  | null
+  | undefined
+  | readonly Jsonable[]
+  | { readonly [key: string]: Jsonable }
+  | { toJSON(): Jsonable };\n\n`;
+
   fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(path.join(dir, fileName), contents);
+  fs.writeFileSync(path.join(dir, fileName), header + contents);
 }
