@@ -53,8 +53,6 @@ function parseStringifiedObject(data: unknown) {
     return;
   }
 
-  console.log("parsing");
-
   return JSON.parse(data, (_, value) => {
     const date = parseStringifiedDate(value);
 

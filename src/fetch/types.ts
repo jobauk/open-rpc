@@ -78,32 +78,31 @@ export type UnionToIntersection<Union> = (
   ? Intersection & Union
   : never;
 
-// biome-ignore lint/suspicious/noExplicitAny: <explanation>
-type ExtractFunction<T> = Extract<T, (...args: any) => any>;
-
-export type Format<T, ResponseFormat> = T extends (
-  ...args: infer P
-) => Promise<infer D>
-  ? P extends [body?: infer Body, options?: infer Options]
+type FormatFunction<T, ResponseFormat> = UnionToIntersection<
+  T extends (body?: infer Body, options?: infer Options) => Promise<infer D>
     ? unknown extends Options
-      ? (options?: P[0]) => Promise<FormatResponse<ResponseFormat, D>>
+      ? (options?: Body) => Promise<FormatResponse<ResponseFormat, D>>
       : (
           body?: Body,
           options?: Options,
         ) => Promise<FormatResponse<ResponseFormat, D>>
-    : (options?: P[0]) => Promise<FormatResponse<ResponseFormat, D>>
-  : T extends (...args: infer P) => infer R
-    ? (params: P[0]) => Format<R, ResponseFormat>
-    : {
-        [K in keyof T]: T[K] extends object
-          ? ExtractFunction<T[K]> extends never
-            ? Format<Pick<T[K], keyof T[K]>, ResponseFormat>
-            : // biome-ignore lint/complexity/noBannedTypes: <explanation>
-              {} extends Pick<T[K], keyof T[K]>
-              ? Format<ExtractFunction<T[K]>, ResponseFormat>
-              : Format<Pick<T[K], keyof T[K]>, ResponseFormat> &
-                  UnionToIntersection<
-                    Format<ExtractFunction<T[K]>, ResponseFormat>
-                  >
-          : T[K];
-      };
+    : T extends (params: infer Params) => infer R
+      ? (
+          params: Params,
+          // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+        ) => R extends (...args: any) => any
+          ? Prettify<Format<R, ResponseFormat>> &
+              FormatFunction<R, ResponseFormat>
+          : Format<R, ResponseFormat>
+      : never
+>;
+
+export type Format<in out T, ResponseFormat> = {
+  [K in keyof T]: T[K] extends object
+    ? // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+      T[K] extends (...args: any) => any
+      ? Prettify<Format<Pick<T[K], keyof T[K]>, ResponseFormat>> &
+          FormatFunction<T[K], ResponseFormat>
+      : Prettify<Format<T[K], ResponseFormat>>
+    : T[K];
+};
