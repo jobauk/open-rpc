@@ -10,13 +10,16 @@ if (process.argv.length <= 2) {
   process.exit();
 }
 
-const openApiUrl = process.argv[2];
+const input = process.argv[2];
+const inputSrc = input.startsWith("http")
+  ? input
+  : path.join(process.cwd(), input);
 const output = process.argv[4].split("/");
 const outputFile = output.pop();
 const outputDir = output.join("/");
 
-if (!URL.canParse(openApiUrl)) {
-  console.log("The open-api source must be a valid url.");
+if (!URL.canParse(inputSrc)) {
+  console.log("The open-api source must be a valid url or file path.");
   process.exit();
 }
 
@@ -27,6 +30,6 @@ if (!outputFile.endsWith(".ts")) {
 
 console.log("Generating...");
 
-generate(openApiUrl, outputDir, outputFile)
+generate(inputSrc, outputDir, outputFile)
   .then(() => console.log(`Successfully generated at: ${process.argv[4]}`))
   .catch((error) => console.error(error));
