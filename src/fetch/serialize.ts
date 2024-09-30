@@ -17,7 +17,9 @@ export function isPrimitivesObject(
     !!v &&
     typeof v === "object" &&
     !Array.isArray(v) &&
-    Object.keys(v).every((v) => typeof v === "string" || "number") &&
+    Object.keys(v).every(
+      (v) => typeof v === "string" || typeof v === "number",
+    ) &&
     Object.values(v).every((v) => isPrimitive(v))
   );
 }
