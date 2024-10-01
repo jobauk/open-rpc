@@ -78,6 +78,27 @@ export type UnionToIntersection<Union> = (
   ? Intersection & Union
   : never;
 
+export type LastInUnion<U> = UnionToIntersection<
+  U extends unknown ? (x: U) => 0 : never
+> extends (x: infer L) => 0
+  ? L
+  : never;
+
+export type UnionToTuple<T, Last = LastInUnion<T>> = [T] extends [never]
+  ? []
+  : [Last, ...UnionToTuple<Exclude<T, Last>>];
+
+export type ExtractFunctions<T> = UnionToTuple<T> extends [
+  (...args: infer P) => infer R,
+  ...infer Rest,
+]
+  ? ((...args: P) => R) | ExtractFunctions<Rest>
+  : // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+    T extends [...any, (...args: infer P) => infer R]
+    ? (...arg: P) => R
+    : // biome-ignore lint/complexity/noBannedTypes: <explanation>
+      {};
+
 type FormatFunction<T, ResponseFormat> = UnionToIntersection<
   T extends (body?: infer Body, options?: infer Options) => Promise<infer D>
     ? unknown extends Options
@@ -96,6 +117,15 @@ type FormatFunction<T, ResponseFormat> = UnionToIntersection<
           : Format<R, ResponseFormat>
       : never
 >;
+
+// biome-ignore lint/suspicious/noExplicitAny: <explanation>
+export type Prepare<T> = T extends (...args: any) => any
+  ? Prettify<
+      Pick<T, keyof T> & {
+        index: ExtractFunctions<T>;
+      }
+    >
+  : T;
 
 export type Format<in out T, ResponseFormat> = {
   [K in keyof T]: T[K] extends object

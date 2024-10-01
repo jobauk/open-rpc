@@ -4,6 +4,7 @@ import type {
   Format,
   Generator,
   Middleware,
+  Prepare,
   ProxyCallback,
   ProxyCallbackOptions,
   Result,
@@ -50,7 +51,10 @@ function createInnerProxy(
       return createInnerProxy(
         callback,
         {
-          path: [...opts.path, key],
+          path:
+            key === "index" && opts.path.length === 0
+              ? [...opts.path]
+              : [...opts.path, key],
           args: opts.args,
         },
         generators,
@@ -229,7 +233,7 @@ export const createClient =
       }
       return response;
     }, options?.generators) as Format<
-      ApiSpec,
+      Prepare<ApiSpec>,
       Extract<TMiddleware["onResponse"], undefined> extends never
         ? ReturnType<Exclude<TMiddleware["onResponse"], undefined>>
         : Result<Data>
