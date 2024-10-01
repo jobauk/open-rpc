@@ -96,7 +96,7 @@ export type ExtractFunctions<T> = UnionToTuple<T> extends [
   (...args: infer P) => infer R,
   ...infer Rest,
 ]
-  ? ((...args: P) => R) & ExtractFunctions<Rest>
+  ? ((...args: P) => R) | ExtractFunctions<Rest>
   : // biome-ignore lint/suspicious/noExplicitAny: <explanation>
     T extends [...any, (...args: infer P) => infer R]
     ? (...arg: P) => R
@@ -122,14 +122,13 @@ type FormatFunction<T, ResponseFormat> = UnionToIntersection<
       : never
 >;
 
-// biome-ignore lint/suspicious/noExplicitAny: <explanation>
-export type Prepare<T> = T extends (...args: any) => any
-  ? Prettify<
+export type Prepare<T, Functions = unknown> = unknown extends Functions
+  ? T
+  : Prettify<
       Pick<T, keyof T> & {
-        index: ExtractFunctions<T>;
+        index: Functions;
       }
-    >
-  : T;
+    >;
 
 export type Format<in out T, ResponseFormat> = {
   [K in keyof T]: T[K] extends object

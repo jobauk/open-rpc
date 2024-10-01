@@ -1,6 +1,7 @@
 import { serializePath, serializeSearchParams } from "./serialize";
 import type {
   Data,
+  ExtractFunctions,
   Format,
   Generator,
   Middleware,
@@ -260,7 +261,7 @@ export const createClient =
       }
       return response;
     }, options?.generators) as Format<
-      Prepare<ApiSpec>,
+      Prepare<ApiSpec, ExtractFunctions<ApiSpec>>,
       Extract<TMiddleware["onResponse"], undefined> extends never
         ? ReturnType<Exclude<TMiddleware["onResponse"], undefined>>
         : Result<Data>
