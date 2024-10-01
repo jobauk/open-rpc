@@ -92,7 +92,7 @@ export type ExtractFunctions<T> = UnionToTuple<T> extends [
   (...args: infer P) => infer R,
   ...infer Rest,
 ]
-  ? ((...args: P) => R) | ExtractFunctions<Rest>
+  ? ((...args: P) => R) & ExtractFunctions<Rest>
   : // biome-ignore lint/suspicious/noExplicitAny: <explanation>
     T extends [...any, (...args: infer P) => infer R]
     ? (...arg: P) => R
