@@ -10,7 +10,7 @@ import type {
   Result,
 } from "./types";
 import { unwrapResponse } from "./unwrap";
-import { ResponseError, ensureError, isJsonable } from "./utils";
+import { ResponseError, ensureError, isJsonable, type Jsonable } from "./utils";
 
 const noop = () => {};
 
@@ -91,7 +91,12 @@ function createInnerProxy(
       }
 
       if (ctx.isGenerator) {
-        return ctx.generatorOpts.push(opts);
+        return ctx.generatorOpts.push({
+          args: methodsWithoutBody.includes(lastSegment)
+            ? ([null, ...args] as ProxyCallbackOptions["args"])
+            : opts.args,
+          path: opts.path,
+        });
       }
 
       const _args = isApply ? (args.length >= 2 ? args[1] : []) : args;
@@ -162,9 +167,23 @@ function mergeHeaders(h1?: HeadersInit, ...h: (HeadersInit | undefined)[]) {
 }
 
 // TODO: Add response type validation
-async function handleFetch(req: Request) {
+async function handleFetch(
+  req: Request,
+): Promise<
+  [
+    Result<
+      | object
+      | Blob
+      | ArrayBuffer
+      | Jsonable
+      | Record<string, FormDataEntryValue>
+    >,
+    Response | null,
+  ]
+> {
   try {
     const res = await fetch(req);
+    const _res = res.clone();
     const data = await unwrapResponse(res);
     const context = isJsonable(data) ? data : null;
     if (!res.ok) {
@@ -173,11 +192,11 @@ async function handleFetch(req: Request) {
         context,
       });
     }
-    return { success: true, data, error: null };
+    return [{ success: true, data, error: null }, _res];
   } catch (err) {
     const error = ensureError(err);
 
-    return { success: false, data: null, error };
+    return [{ success: false, data: null, error }, null];
   }
 }
 
@@ -224,11 +243,19 @@ export const createClient =
         });
       }
 
-      const response = await handleFetch(req);
+      if (options?.middleware?.onRequest) {
+        req = options.middleware.onRequest(req, {
+          baseUrl,
+          init: options?.init,
+        });
+      }
+
+      const [response, clonedResponse] = await handleFetch(req);
       if (options?.middleware?.onResponse) {
         return options.middleware.onResponse(response as Result<Data>, {
           baseUrl,
           init: options?.init,
+          response: clonedResponse,
         });
       }
       return response;

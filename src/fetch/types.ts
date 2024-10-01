@@ -45,9 +45,13 @@ export type Param = Record<
 export type Segment = DefinedPrimitive | Param;
 
 export type Middleware = {
+  onRequest?: (
+    request: Request,
+    ctx: { baseUrl: string; init?: RequestInit },
+  ) => Request;
   onResponse?: (
     response: Result<Data>,
-    options: { baseUrl: string; init?: RequestInit },
+    ctx: { baseUrl: string; init?: RequestInit; response: Response | null },
   ) => unknown;
 };
 
