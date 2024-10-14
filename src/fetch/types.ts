@@ -21,8 +21,8 @@ export interface ProxyCallbackOptions {
     null | undefined | BodyInit,
     (
       | {
-          $query?: Record<string, unknown>;
-          $headers?: Record<string, string>;
+          query?: Record<string, unknown>;
+          headers?: Record<string, string>;
         }
       | undefined
     ),
@@ -34,6 +34,11 @@ export type ProxyCallback = (opts: ProxyCallbackOptions | Request) => unknown;
 export type GeneratorOptions = ProxyCallbackOptions[];
 
 export type Generator = (opts: GeneratorOptions) => Request;
+
+export type ExtendedHeadersInit =
+  | HeadersInit
+  | ((path: string) => HeadersInit | undefined)
+  | (((path: string) => HeadersInit | undefined) | HeadersInit | undefined)[];
 
 export type Param = Record<
   string | number,
@@ -56,8 +61,13 @@ export type Middleware = {
 };
 
 export type Result<T> =
-  | { success: true; data: T; error: null }
-  | { success: false; data: null; error: ResponseError };
+  | { success: true; data: T; error: null; response: Response }
+  | {
+      success: false;
+      data: null;
+      error: ResponseError;
+      response: Response | null;
+    };
 
 export declare const brand: unique symbol;
 export type Branded<T, U> = T & { [k in typeof brand]: U };

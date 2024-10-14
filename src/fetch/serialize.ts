@@ -1,8 +1,9 @@
 import type { DefinedPrimitive, Segment } from "./types";
 
 export function isPrimitive(v: unknown): v is DefinedPrimitive {
-  return ["null", "string", "number", "boolean", "symbol", "bigint"].includes(
-    typeof v,
+  return (
+    v === null ||
+    ["string", "number", "boolean", "symbol", "bigint"].includes(typeof v)
   );
 }
 
@@ -35,7 +36,7 @@ export function isPrimitivesWithArrayObject(
   );
 }
 
-function getNameAndValue(
+export function getNameAndValue(
   value: Record<string, unknown>,
 ): [string | null, unknown] {
   if (isPrimitive(value)) {
@@ -163,7 +164,7 @@ export function serializePath(segments: Segment[]) {
     } else {
       if (isPrimitive(segment)) {
         path += `/${String(segment)}`;
-      } else if (isPrimitivesObject(segment)) {
+      } else if (isPrimitivesWithArrayObject(segment)) {
         path += `/${serializeSimple(segment, false)}`;
       }
     }

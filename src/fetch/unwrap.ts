@@ -7,15 +7,15 @@ const isFormalDate =
 const isShortenDate =
   /^(?:(?:(?:(?:0?[1-9]|[12][0-9]|3[01])[/\s-](?:0?[1-9]|1[0-2])[/\s-](?:19|20)\d{2})|(?:(?:19|20)\d{2}[/\s-](?:0?[1-9]|1[0-2])[/\s-](?:0?[1-9]|[12][0-9]|3[01]))))(?:\s(?:1[012]|0?[1-9]):[0-5][0-9](?::[0-5][0-9])?(?:\s[AP]M)?)?$/;
 
-function isNumericString(message: unknown) {
+export function isNumericString(value: unknown): value is `${number}` {
   return (
-    typeof message === "string" &&
-    message.trim().length !== 0 &&
-    !Number.isNaN(Number(message))
+    typeof value === "string" &&
+    value.trim().length !== 0 &&
+    !Number.isNaN(Number(value))
   );
 }
 
-function parseStringifiedDate(value: unknown) {
+export function parseStringifiedDate(value: unknown) {
   if (typeof value !== "string") {
     return null;
   }
@@ -37,7 +37,7 @@ function parseStringifiedDate(value: unknown) {
   return null;
 }
 
-function isStringifiedObject(value: unknown) {
+export function isStringifiedObject(value: unknown) {
   if (typeof value !== "string") {
     return false;
   }
@@ -48,30 +48,26 @@ function isStringifiedObject(value: unknown) {
   return (start === 123 && end === 125) || (start === 91 && end === 93);
 }
 
-function parseStringifiedObject(data: unknown) {
+export function parseStringifiedObject(data: unknown) {
   if (typeof data !== "string") {
     return;
   }
 
-  return JSON.parse(data, (_, value) => {
-    const date = parseStringifiedDate(value);
-
-    if (date) {
-      return date;
-    }
-
-    return value;
-  }) as string;
+  return JSON.parse(data, (_, value) => parseStringifiedValue(value)) as string;
 }
 
 export const parseStringifiedValue = (
   value: unknown,
-): undefined | object | number | boolean | Date | string => {
+): object | number | boolean | Date | string => {
   if (!value) {
     return "";
   }
 
   if (isNumericString(value)) {
+    if (+value > Number.MAX_SAFE_INTEGER) {
+      return value;
+    }
+
     return +value;
   }
 
@@ -91,14 +87,14 @@ export const parseStringifiedValue = (
 
   if (isStringifiedObject(value)) {
     try {
-      return parseStringifiedObject(value);
+      return parseStringifiedObject(value) || "";
     } catch {}
   }
 
   return value;
 };
 
-async function handleApplication(res: Response, type: string) {
+export async function handleApplication(res: Response, type: string) {
   switch (true) {
     case type.endsWith("json"):
       return await res.text().then(parseStringifiedObject);
@@ -109,13 +105,13 @@ async function handleApplication(res: Response, type: string) {
   }
 }
 
-async function handleMultiPart(res: Response, type: string) {
+export async function handleMultiPart(res: Response, type: string) {
   switch (true) {
     case type.endsWith("form-data"): {
       const formData = await res.formData();
-      const data: Record<string, FormDataEntryValue> = {};
+      const data: Record<string, ReturnType<typeof parseStringifiedValue>> = {};
       for (const [key, value] of formData.entries()) {
-        data[key] = value;
+        data[key] = parseStringifiedValue(value);
       }
       return data;
     }
@@ -125,7 +121,11 @@ async function handleMultiPart(res: Response, type: string) {
 export async function unwrapResponse(
   res: Response,
 ): Promise<
-  Jsonable | ArrayBuffer | Blob | Record<string, FormDataEntryValue> | object
+  | Jsonable
+  | ArrayBuffer
+  | Blob
+  | Record<string, ReturnType<typeof parseStringifiedValue>>
+  | object
 > {
   const [group, type] = res.headers
     .get("content-type")

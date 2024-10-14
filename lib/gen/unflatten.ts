@@ -62,19 +62,19 @@ function createHttpMethod(
     ts.factory.createTypeLiteralNode([
       ts.factory.createPropertySignature(
         undefined,
-        ts.factory.createIdentifier("$query"),
+        ts.factory.createIdentifier("query"),
         ts.factory.createToken(ts.SyntaxKind.QuestionToken),
         operation.query,
       ),
       ts.factory.createPropertySignature(
         undefined,
-        ts.factory.createIdentifier("$headers"),
+        ts.factory.createIdentifier("headers"),
         ts.factory.createToken(ts.SyntaxKind.QuestionToken),
         operation.headers,
       ),
       ts.factory.createPropertySignature(
         undefined,
-        ts.factory.createIdentifier("$cookies"),
+        ts.factory.createIdentifier("cookies"),
         ts.factory.createToken(ts.SyntaxKind.QuestionToken),
         operation.cookies,
       ),
@@ -100,7 +100,7 @@ function createHttpMethods(
   type: ts.TypeLiteralNode,
   operations: Record<string, Operation>,
 ) {
-  const members = [];
+  const members: ts.PropertySignature[] = [];
   for (const member of type.members) {
     if (
       !ts.isPropertySignature(member) ||

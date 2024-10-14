@@ -24,7 +24,9 @@
     // Some stricter flags
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    "noPropertyAccessFromIndexSignature": true
+    "noPropertyAccessFromIndexSignature": true,
+
+    "declarationDir": "./dist/src"
   },
-  "include": ["lib", "src"]
+  "include": ["src"]
 }

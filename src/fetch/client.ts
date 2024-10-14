@@ -1,6 +1,7 @@
 import { serializePath, serializeSearchParams } from "./serialize";
 import type {
   Data,
+  ExtendedHeadersInit,
   ExtractFunctions,
   Format,
   Generator,
@@ -11,7 +12,13 @@ import type {
   Result,
 } from "./types";
 import { unwrapResponse } from "./unwrap";
-import { ResponseError, ensureError, isJsonable, type Jsonable } from "./utils";
+import {
+  type Jsonable,
+  ResponseError,
+  ensureError,
+  isJsonable,
+  isResponseError,
+} from "./utils";
 
 const noop = () => {};
 
@@ -134,53 +141,88 @@ const createRecursiveProxy = (
 
 /**
  *
- * @param h1 Base headers.
- * @param h Array of extra headers to merge.
+ * @param headersArray Array of headers to merge.
  * @returns Merged headers.
  * @internal
  */
-function mergeHeaders(h1?: HeadersInit, ...h: (HeadersInit | undefined)[]) {
-  const toLowerCaseKeys = (obj: HeadersInit) => {
-    return Object.fromEntries(
-      Object.entries(obj).map(([key, value]) => [key.toLowerCase(), value]),
-    );
-  };
+function mergeHeaders(headersArray: (HeadersInit | undefined)[]) {
+  const _headers = new Headers();
 
-  let rawHeaders = h1;
-  for (const headers of h) {
-    if (
-      Array.isArray(headers) &&
-      headers.every((header) => Array.isArray(header))
-    ) {
-      const joinedHeaders: Record<string, string> = {};
-      for (const [key, value] of headers) {
-        joinedHeaders[key.toLowerCase()] = value;
-      }
-      rawHeaders = { ...rawHeaders, ...joinedHeaders };
-    } else {
-      if (headers) {
-        rawHeaders = { ...rawHeaders, ...toLowerCaseKeys(headers) };
-      }
+  for (const init of headersArray) {
+    if (!init) continue;
+
+    const iterable =
+      init instanceof Headers
+        ? init.entries()
+        : Array.isArray(init)
+          ? init
+          : Object.entries(init);
+
+    for (const [key, value] of iterable) {
+      _headers.set(key, value);
     }
   }
 
-  return new Headers(rawHeaders);
+  return _headers;
+}
+
+/**
+ *
+ * Adds support for functions as headers.
+ *
+ * @internal
+ */
+function initToHeaders(
+  init: HeadersInit | ((path: string) => HeadersInit | undefined) | undefined,
+  path: string,
+) {
+  if (typeof init === "function") {
+    return new Headers(init(path));
+  }
+
+  return new Headers(init);
+}
+
+/**
+ *
+ * Builds headers different sources including dynamic functions
+ *
+ * @internal
+ */
+function buildHeaders(
+  headersArray: ExtendedHeadersInit | undefined,
+  path: string,
+) {
+  if (!headersArray) {
+    return [];
+  }
+
+  const _headers: Headers[] = [];
+  if (Array.isArray(headersArray) && !headersArray.every(Array.isArray)) {
+    for (const headers of headersArray) {
+      _headers.push(initToHeaders(headers, path));
+    }
+  } else {
+    _headers.push(initToHeaders(headersArray, path));
+  }
+
+  return _headers;
 }
 
 // TODO: Add response type validation
-async function handleFetch(
+
+/**
+ *
+ * Handles the fetch request, unwraps the response, construct errors, and formats the response
+ *
+ * @internal
+ */
+export async function handleFetch(
   req: Request,
 ): Promise<
-  [
-    Result<
-      | object
-      | Blob
-      | ArrayBuffer
-      | Jsonable
-      | Record<string, FormDataEntryValue>
-    >,
-    Response | null,
-  ]
+  Result<
+    object | Blob | ArrayBuffer | Jsonable | Record<string, FormDataEntryValue>
+  >
 > {
   try {
     const res = await fetch(req);
@@ -189,18 +231,50 @@ async function handleFetch(
     const context = isJsonable(data) ? data : null;
     if (!res.ok) {
       throw new ResponseError(res.statusText, {
-        response: res,
+        response: _res,
         context,
       });
     }
-    return [{ success: true, data, error: null }, _res];
+    return { success: true, data, error: null, response: _res };
   } catch (err) {
     const error = ensureError(err);
 
-    return [{ success: false, data: null, error }, null];
+    if (isResponseError(error)) {
+      return {
+        success: false,
+        data: null,
+        error,
+        response: error.response || null,
+      };
+    }
+
+    return { success: false, data: null, error, response: null };
   }
 }
 
+/**
+ *
+ * Creates a new client
+ *
+ * @example
+ * ```ts
+ * const client = createClient<ApiSpec>("https://api.example.com")({
+ *   headers: [
+ *     {
+ *       "content-type": "application/json;charset=utf-8",
+ *     },
+ *     (path) => {
+ *       if (path.startsWith("/users")) {
+ *         return {
+ *           authorization: "Bearer 123",
+ *         };
+ *       }
+ *     },
+ *   ],
+ * });
+ * ```
+ *
+ */
 export const createClient =
   <
     // biome-ignore lint/suspicious/noExplicitAny: <explanation>
@@ -211,7 +285,8 @@ export const createClient =
     baseUrl: string,
   ) =>
   <TMiddleware extends Middleware>(options?: {
-    init?: RequestInit;
+    init?: Omit<RequestInit, "headers">;
+    headers?: ExtendedHeadersInit;
     middleware?: TMiddleware;
     generators?: Record<string, Generator>;
   }) =>
@@ -220,27 +295,35 @@ export const createClient =
       let req: Request;
 
       if (opts instanceof Request) {
-        req = new Request(opts, { ...options?.init });
+        const headers = mergeHeaders([
+          { "content-type": "application/json" },
+          ...buildHeaders(options?.headers, new URL(opts.url).pathname),
+          opts.headers,
+        ]);
+        req = new Request(opts, {
+          ...options?.init,
+          headers,
+        });
       } else {
         const path = opts.path;
         const args = opts.args;
         const method = path.pop() as string;
         const fullPath = serializePath(path);
 
-        const params = serializeSearchParams(args[1]?.$query);
+        const params = serializeSearchParams(args[1]?.query);
         const uri = `${_baseUrl}${fullPath}${params}`;
         const body = args[0] ? JSON.stringify(args[0]) : null;
-        const headers = args[1]?.$headers;
+        const headers = args[1]?.headers;
 
         req = new Request(uri, {
           ...options?.init,
           method,
           body,
-          headers: mergeHeaders(
-            options?.init?.headers,
-            [["content-type", "application/json"]],
+          headers: mergeHeaders([
+            { "content-type": "application/json" },
+            ...buildHeaders(options?.headers, fullPath),
             headers,
-          ),
+          ]),
         });
       }
 
@@ -251,15 +334,16 @@ export const createClient =
         });
       }
 
-      const [response, clonedResponse] = await handleFetch(req);
+      const result = await handleFetch(req);
       if (options?.middleware?.onResponse) {
-        return options.middleware.onResponse(response as Result<Data>, {
+        return options.middleware.onResponse(result as Result<Data>, {
           baseUrl,
           init: options?.init,
-          response: clonedResponse,
+          response: result.response,
         });
       }
-      return response;
+
+      return result;
     }, options?.generators) as Format<
       Prepare<ApiSpec, ExtractFunctions<ApiSpec>>,
       Extract<TMiddleware["onResponse"], undefined> extends never
