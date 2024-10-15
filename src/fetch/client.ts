@@ -5,6 +5,7 @@ import type {
   ExtractFunctions,
   Format,
   Generator,
+  GetResponseFormat,
   Middleware,
   Prepare,
   ProxyCallback,
@@ -339,15 +340,12 @@ export const createClient =
         return options.middleware.onResponse(result as Result<Data>, {
           baseUrl,
           init: options?.init,
-          response: result.response,
         });
       }
 
       return result;
     }, options?.generators) as Format<
       Prepare<ApiSpec, ExtractFunctions<ApiSpec>>,
-      Extract<TMiddleware["onResponse"], undefined> extends never
-        ? ReturnType<Exclude<TMiddleware["onResponse"], undefined>>
-        : Result<Data>
+      GetResponseFormat<TMiddleware>
     > &
       TExtended;

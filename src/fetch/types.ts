@@ -49,15 +49,19 @@ export type Param = Record<
 
 export type Segment = DefinedPrimitive | Param;
 
+type onRequestHandler = (
+  request: Request,
+  ctx: { baseUrl: string; init?: RequestInit },
+) => Request;
+
+type onResponseHandler = (
+  response: Result<Data>,
+  ctx: { baseUrl: string; init?: RequestInit },
+) => unknown;
+
 export type Middleware = {
-  onRequest?: (
-    request: Request,
-    ctx: { baseUrl: string; init?: RequestInit },
-  ) => Request;
-  onResponse?: (
-    response: Result<Data>,
-    ctx: { baseUrl: string; init?: RequestInit; response: Response | null },
-  ) => unknown;
+  onRequest?: onRequestHandler;
+  onResponse?: onResponseHandler;
 };
 
 export type Result<T> =
@@ -106,7 +110,7 @@ export type ExtractFunctions<T> = UnionToTuple<T> extends [
   (...args: infer P) => infer R,
   ...infer Rest,
 ]
-  ? ((...args: P) => R) & ExtractFunctions<Rest>
+  ? ((...args: P) => R) | ExtractFunctions<Rest>
   : // biome-ignore lint/suspicious/noExplicitAny: <explanation>
     T extends [...any, (...args: infer P) => infer R]
     ? (...arg: P) => R
@@ -149,3 +153,9 @@ export type Format<in out T, ResponseFormat> = {
       : Prettify<Format<T[K], ResponseFormat>>
     : T[K];
 };
+
+export type GetResponseFormat<
+  TMiddleware extends Partial<Record<"onResponse", onResponseHandler>>,
+> = Extract<TMiddleware["onResponse"], undefined> extends never
+  ? ReturnType<Exclude<TMiddleware["onResponse"], undefined>>
+  : Result<Data>;
