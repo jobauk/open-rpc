@@ -82,11 +82,13 @@ type FormatResponse<T, D> = T extends Data
   ? D
   : T extends ResponseError
     ? ResponseError
-    : T extends object
-      ? {
-          [K in keyof T]: FormatResponse<T[K], D>;
-        }
-      : T;
+    : T extends Response
+      ? Response
+      : T extends object
+        ? {
+            [K in keyof T]: FormatResponse<T[K], D>;
+          }
+        : T;
 
 export type UnionToIntersection<Union> = (
   Union extends unknown
