@@ -73,6 +73,28 @@ export type Result<T> =
       response: Response | null;
     };
 
+export interface HKT {
+  // will reference the A type
+  readonly _A?: unknown;
+
+  // will represent the computed type
+  readonly type?: unknown;
+}
+
+type Kind<F extends HKT, A> = F extends {
+  readonly type: unknown;
+}
+  ? // F has a type specified, it is concrete (like F = ArrayHKT)
+    (F & {
+      readonly _A: A;
+    })["type"]
+  : // F is generic, we need to mention all of the type parameters
+    // to guarantee that they are never excluded from type checking
+    {
+      readonly _F: F;
+      readonly _A: () => A;
+    };
+
 export declare const brand: unique symbol;
 export type Branded<T, U> = T & { [k in typeof brand]: U };
 
@@ -117,22 +139,28 @@ export type ExtractFunctions<T> = UnionToTuple<T> extends [
     ? (...arg: P) => R
     : never;
 
-type FormatFunction<T, ResponseFormat> = UnionToIntersection<
+type FormatFunction<
+  T,
+  ResponseFormat,
+  TransformResponse extends HKT,
+> = UnionToIntersection<
   T extends (body?: infer Body, options?: infer Options) => Promise<infer D>
     ? unknown extends Options
-      ? (options?: Body) => Promise<FormatResponse<ResponseFormat, D>>
+      ? (
+          options?: Body,
+        ) => Promise<Kind<TransformResponse, FormatResponse<ResponseFormat, D>>>
       : (
           body?: Body,
           options?: Options,
-        ) => Promise<FormatResponse<ResponseFormat, D>>
+        ) => Promise<Kind<TransformResponse, FormatResponse<ResponseFormat, D>>>
     : T extends (params: infer Params) => infer R
       ? (
           params: Params,
           // biome-ignore lint/suspicious/noExplicitAny: <explanation>
         ) => R extends (...args: any) => any
-          ? Prettify<Format<R, ResponseFormat>> &
-              FormatFunction<R, ResponseFormat>
-          : Format<R, ResponseFormat>
+          ? Prettify<Format<R, ResponseFormat, TransformResponse>> &
+              FormatFunction<R, ResponseFormat, TransformResponse>
+          : Format<R, ResponseFormat, TransformResponse>
       : never
 >;
 
@@ -144,13 +172,15 @@ export type Prepare<T, Functions = unknown> = unknown extends Functions
       }
     >;
 
-export type Format<in out T, ResponseFormat> = {
+export type Format<in out T, ResponseFormat, TransformResponse extends HKT> = {
   [K in keyof T]: T[K] extends object
     ? // biome-ignore lint/suspicious/noExplicitAny: <explanation>
       T[K] extends (...args: any) => any
-      ? Prettify<Format<Pick<T[K], keyof T[K]>, ResponseFormat>> &
-          FormatFunction<T[K], ResponseFormat>
-      : Prettify<Format<T[K], ResponseFormat>>
+      ? Prettify<
+          Format<Pick<T[K], keyof T[K]>, ResponseFormat, TransformResponse>
+        > &
+          FormatFunction<T[K], ResponseFormat, TransformResponse>
+      : Prettify<Format<T[K], ResponseFormat, TransformResponse>>
     : T[K];
 };
 

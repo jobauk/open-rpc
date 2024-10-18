@@ -6,6 +6,7 @@ import type {
   Format,
   Generator,
   GetResponseFormat,
+  HKT,
   Middleware,
   Prepare,
   ProxyCallback,
@@ -295,6 +296,7 @@ export const createClient =
     ApiSpec extends { [key: string]: any },
     // biome-ignore lint/complexity/noBannedTypes: <explanation>
     TExtended extends Record<string | number, unknown> = {},
+    TransformResponse extends HKT = DefaultTransform,
   >(
     baseUrl: string,
   ) =>
@@ -372,7 +374,12 @@ export const createClient =
       options?.static,
     ) as Format<
       Prepare<ApiSpec, ExtractFunctions<ApiSpec>>,
-      GetResponseFormat<TMiddleware>
+      GetResponseFormat<TMiddleware>,
+      TransformResponse
     > &
       TStatic &
       TExtended;
+
+interface DefaultTransform extends HKT {
+  readonly type: this["_A"];
+}
