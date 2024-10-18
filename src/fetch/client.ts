@@ -60,7 +60,7 @@ function createInnerProxy(
         return Reflect.get(_obj, key);
       }
 
-      if (generators && Object.keys(generators).includes(key)) {
+      if (generators && key in generators) {
         ctx.isGenerator = true;
       }
 

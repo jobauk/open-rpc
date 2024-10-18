@@ -1,6 +1,6 @@
 {
   "name": "@snuifstuif/open-rpc",
-  "version": "0.3.14",
+  "version": "0.3.17",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Snuifstuif/open-rpc.git"
@@ -16,7 +16,7 @@
   "types": "./dist/src/index.d.ts",
   "files": ["dist"],
   "scripts": {
-    "build": "bun build ./src/index.ts --outdir ./dist/src --target node --minify --drop=console && bun build:lib && bun build:types",
+    "build": "bun build ./src/index.ts --outdir ./dist/src --target node --drop=console && bun build:lib && bun build:types",
     "build:lib": "bun build ./lib/index.ts --outdir ./dist/lib --target node --format cjs --minify --drop=console",
     "build:types": "tsc --project ./tsconfig.json",
     "check": "bun biome check --write ./src ./lib ./tests",
