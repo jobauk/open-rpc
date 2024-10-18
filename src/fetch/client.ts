@@ -40,17 +40,24 @@ function createInnerProxy(
   callback: ProxyCallback,
   opts: ProxyCallbackOptions,
   generators: Record<string, Generator> | undefined,
+  staticProperties: // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+    | Record<string, ((...args: any[]) => any) | Record<string, unknown>>
+    | typeof noop,
   ctx: {
     isGenerator: boolean;
     generatorOpts: ProxyCallbackOptions[];
   },
 ) {
-  const proxy: unknown = new Proxy(noop, {
+  const proxy: unknown = new Proxy(staticProperties || noop, {
     get(_obj, key) {
       if (typeof key !== "string" || key === "then") {
         // special case for if the proxy is accidentally treated
         // like a PromiseLike (like in `Promise.resolve(proxy)`)
         return undefined;
+      }
+
+      if (staticProperties && key in staticProperties) {
+        return Reflect.get(_obj, key);
       }
 
       if (generators && Object.keys(generators).includes(key)) {
@@ -67,6 +74,7 @@ function createInnerProxy(
           args: opts.args,
         },
         generators,
+        noop,
         ctx,
       );
     },
@@ -87,6 +95,7 @@ function createInnerProxy(
             args: opts.args,
           },
           generators,
+          noop,
           ctx,
         );
       }
@@ -129,6 +138,9 @@ function createInnerProxy(
 const createRecursiveProxy = (
   callback: ProxyCallback,
   generators: Record<string, Generator> | undefined,
+  staticProperties: // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+    | Record<string, ((...args: any[]) => any) | Record<string, unknown>>
+    | undefined,
 ) =>
   createInnerProxy(
     callback,
@@ -137,6 +149,7 @@ const createRecursiveProxy = (
       args: [null, {}],
     },
     generators,
+    staticProperties || noop,
     { isGenerator: false, generatorOpts: [] },
   );
 
@@ -285,67 +298,81 @@ export const createClient =
   >(
     baseUrl: string,
   ) =>
-  <TMiddleware extends Middleware>(options?: {
+  <
+    TMiddleware extends Middleware,
+    TStatic extends Record<
+      string,
+      // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+      ((...args: any[]) => any) | Record<string, unknown>
+      // biome-ignore lint/complexity/noBannedTypes: <explanation>
+    > = {},
+  >(options?: {
     init?: Omit<RequestInit, "headers">;
     headers?: ExtendedHeadersInit;
     middleware?: TMiddleware;
     generators?: Record<string, Generator>;
+    static?: TStatic;
   }) =>
-    createRecursiveProxy(async (opts) => {
-      const _baseUrl = baseUrl.endsWith("/") ? baseUrl.slice(0, -1) : baseUrl;
-      let req: Request;
+    createRecursiveProxy(
+      async (opts) => {
+        const _baseUrl = baseUrl.endsWith("/") ? baseUrl.slice(0, -1) : baseUrl;
+        let req: Request;
 
-      if (opts instanceof Request) {
-        const headers = mergeHeaders([
-          { "content-type": "application/json" },
-          ...buildHeaders(options?.headers, new URL(opts.url).pathname),
-          opts.headers,
-        ]);
-        req = new Request(opts, {
-          ...options?.init,
-          headers,
-        });
-      } else {
-        const path = opts.path;
-        const args = opts.args;
-        const method = path.pop() as string;
-        const fullPath = serializePath(path);
-
-        const params = serializeSearchParams(args[1]?.query);
-        const uri = `${_baseUrl}${fullPath}${params}`;
-        const body = args[0] ? JSON.stringify(args[0]) : null;
-        const headers = args[1]?.headers;
-
-        req = new Request(uri, {
-          ...options?.init,
-          method,
-          body,
-          headers: mergeHeaders([
+        if (opts instanceof Request) {
+          const headers = mergeHeaders([
             { "content-type": "application/json" },
-            ...buildHeaders(options?.headers, fullPath),
+            ...buildHeaders(options?.headers, new URL(opts.url).pathname),
+            opts.headers,
+          ]);
+          req = new Request(opts, {
+            ...options?.init,
             headers,
-          ]),
-        });
-      }
+          });
+        } else {
+          const path = opts.path;
+          const args = opts.args;
+          const method = path.pop() as string;
+          const fullPath = serializePath(path);
 
-      if (options?.middleware?.onRequest) {
-        req = options.middleware.onRequest(req, {
-          baseUrl,
-          init: options?.init,
-        });
-      }
+          const params = serializeSearchParams(args[1]?.query);
+          const uri = `${_baseUrl}${fullPath}${params}`;
+          const body = args[0] ? JSON.stringify(args[0]) : null;
+          const headers = args[1]?.headers;
 
-      const result = await handleFetch(req);
-      if (options?.middleware?.onResponse) {
-        return options.middleware.onResponse(result as Result<Data>, {
-          baseUrl,
-          init: options?.init,
-        });
-      }
+          req = new Request(uri, {
+            ...options?.init,
+            method,
+            body,
+            headers: mergeHeaders([
+              { "content-type": "application/json" },
+              ...buildHeaders(options?.headers, fullPath),
+              headers,
+            ]),
+          });
+        }
 
-      return result;
-    }, options?.generators) as Format<
+        if (options?.middleware?.onRequest) {
+          req = options.middleware.onRequest(req, {
+            baseUrl,
+            init: options?.init,
+          });
+        }
+
+        const result = await handleFetch(req);
+        if (options?.middleware?.onResponse) {
+          return options.middleware.onResponse(result as Result<Data>, {
+            baseUrl,
+            init: options?.init,
+          });
+        }
+
+        return result;
+      },
+      options?.generators,
+      options?.static,
+    ) as Format<
       Prepare<ApiSpec, ExtractFunctions<ApiSpec>>,
       GetResponseFormat<TMiddleware>
     > &
+      TStatic &
       TExtended;
