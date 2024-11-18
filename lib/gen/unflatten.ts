@@ -2,9 +2,11 @@ import ts from "typescript";
 import { methods, methodsWithoutBody } from "../../src/fetch/client";
 import type { Operation } from "./get-operations";
 
-function createParameterFunctionNode(key: string, type: ts.TypeNode) {
-  const cleanKey = key.replace(/{|}/g, "");
-
+function createParameterFunctionNode(
+  key: string,
+  returnType: ts.TypeNode,
+  parameterType?: ts.TypeNode,
+) {
   const parameters = [
     ts.factory.createParameterDeclaration(
       undefined,
@@ -14,19 +16,20 @@ function createParameterFunctionNode(key: string, type: ts.TypeNode) {
       ts.factory.createTypeLiteralNode([
         ts.factory.createPropertySignature(
           undefined,
-          ts.factory.createIdentifier(cleanKey),
+          ts.factory.createIdentifier(key),
           undefined,
-          ts.factory.createUnionTypeNode([
-            ts.factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
-            ts.factory.createKeywordTypeNode(ts.SyntaxKind.NumberKeyword),
-          ]),
+          parameterType ||
+            ts.factory.createUnionTypeNode([
+              ts.factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
+              ts.factory.createKeywordTypeNode(ts.SyntaxKind.NumberKeyword),
+            ]),
         ),
       ]),
       undefined,
     ),
   ];
 
-  return ts.factory.createFunctionTypeNode(undefined, parameters, type);
+  return ts.factory.createFunctionTypeNode(undefined, parameters, returnType);
 }
 
 function createPropertySignature(name: string, type: ts.TypeNode) {
@@ -162,6 +165,7 @@ function mergeChildNodes(
   ]);
 }
 
+const touched = false;
 function buildChildNodes(
   parentKey: string | null,
   tree: {
@@ -219,7 +223,42 @@ function buildChildNodes(
   );
 
   if (isParam) {
-    return createParameterFunctionNode(parentKey, children);
+    const cleanKey = parentKey.replace(/{|}/g, "");
+
+    const returnType = tree.node?.members
+      .flatMap((member) => {
+        if (
+          !ts.isPropertySignature(member) ||
+          !member.name ||
+          !ts.isIdentifier(member.name) ||
+          !methods.includes(member.name.text) ||
+          !member.type ||
+          !ts.isIndexedAccessTypeNode(member.type) ||
+          !ts.isLiteralTypeNode(member.type.indexType) ||
+          !ts.isStringLiteral(member.type.indexType.literal) ||
+          !operations[member.type.indexType.literal.text].path ||
+          !ts.isTypeLiteralNode(
+            // biome-ignore lint/style/noNonNullAssertion: <explanation>
+            operations[member.type.indexType.literal.text].path!,
+          )
+        ) {
+          return;
+        }
+
+        return (
+          operations[member.type.indexType.literal.text]
+            .path as ts.TypeLiteralNode
+        ).members;
+      })
+      .find(
+        (member): member is ts.PropertySignature =>
+          !!member?.name &&
+          ts.isIdentifier(member.name) &&
+          member.name.text === cleanKey &&
+          ts.isPropertySignature(member),
+      );
+
+    return createParameterFunctionNode(cleanKey, children, returnType?.type);
   }
 
   // This means that it is a return type of a function
