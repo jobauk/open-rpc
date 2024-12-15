@@ -1,6 +1,6 @@
 {
   "name": "@snuifstuif/open-rpc",
-  "version": "0.3.19",
+  "version": "0.3.20",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Snuifstuif/open-rpc.git"
@@ -24,12 +24,13 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
-    "@types/bun": "latest"
+    "@types/bun": "latest",
+    "tinybench": "^3.0.7"
   },
   "peerDependencies": {
     "typescript": "^5.5.2"
   },
   "dependencies": {
-    "openapi-typescript": "^7.4.3"
+    "openapi-typescript": "^7.4.4"
   }
 }

@@ -7,19 +7,7 @@ const isFormalDate =
 const isShortenDate =
   /^(?:(?:(?:(?:0?[1-9]|[12][0-9]|3[01])[/\s-](?:0?[1-9]|1[0-2])[/\s-](?:19|20)\d{2})|(?:(?:19|20)\d{2}[/\s-](?:0?[1-9]|1[0-2])[/\s-](?:0?[1-9]|[12][0-9]|3[01]))))(?:\s(?:1[012]|0?[1-9]):[0-5][0-9](?::[0-5][0-9])?(?:\s[AP]M)?)?$/;
 
-export function isNumericString(value: unknown): value is `${number}` {
-  return (
-    typeof value === "string" &&
-    value.trim().length !== 0 &&
-    !Number.isNaN(Number(value))
-  );
-}
-
-export function parseStringifiedDate(value: unknown) {
-  if (typeof value !== "string") {
-    return null;
-  }
-
+export function parseStringifiedDate(value: string) {
   const temp = value.replace(/"/g, "");
 
   if (
@@ -37,6 +25,68 @@ export function parseStringifiedDate(value: unknown) {
   return null;
 }
 
+export function parseStringifiedValue(value: unknown) {
+  if (typeof value !== "string") {
+    return "";
+  }
+
+  const _value = value.trim();
+
+  if (!_value) {
+    return "";
+  }
+
+  if (_value === "true") {
+    return true;
+  }
+
+  if (_value === "false") {
+    return false;
+  }
+
+  if (_value === "null") {
+    return null;
+  }
+
+  const number = Number(_value);
+  if (!Number.isNaN(number)) {
+    if (number > Number.MAX_SAFE_INTEGER || number < Number.MIN_SAFE_INTEGER) {
+      return _value;
+    }
+
+    return number;
+  }
+
+  const date = parseStringifiedDate(_value);
+
+  if (date) {
+    return date;
+  }
+
+  return value;
+}
+
+export function parseStringifiedObject(data: unknown) {
+  if (typeof data !== "string") {
+    return;
+  }
+
+  return JSON.parse(data, (_, value) => {
+    switch (typeof value) {
+      case "boolean":
+        return value;
+      case "number":
+        return value;
+      case "object":
+        return value;
+      case "string":
+        return parseStringifiedValue(value);
+      default:
+        return value;
+    }
+  });
+}
+
 export function isStringifiedObject(value: unknown) {
   if (typeof value !== "string") {
     return false;
@@ -47,52 +97,6 @@ export function isStringifiedObject(value: unknown) {
 
   return (start === 123 && end === 125) || (start === 91 && end === 93);
 }
-
-export function parseStringifiedObject(data: unknown) {
-  if (typeof data !== "string") {
-    return;
-  }
-
-  return JSON.parse(data, (_, value) => parseStringifiedValue(value)) as string;
-}
-
-export const parseStringifiedValue = (
-  value: unknown,
-): object | number | boolean | Date | string => {
-  if (!value) {
-    return "";
-  }
-
-  if (isNumericString(value)) {
-    if (+value > Number.MAX_SAFE_INTEGER) {
-      return value;
-    }
-
-    return +value;
-  }
-
-  if (value === "true") {
-    return true;
-  }
-
-  if (value === "false") {
-    return false;
-  }
-
-  const date = parseStringifiedDate(value);
-
-  if (date) {
-    return date;
-  }
-
-  if (isStringifiedObject(value)) {
-    try {
-      return parseStringifiedObject(value) || "";
-    } catch {}
-  }
-
-  return value;
-};
 
 export async function handleApplication(res: Response, type: string) {
   switch (true) {
