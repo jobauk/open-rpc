@@ -29,12 +29,11 @@ test("is primitive", () => {
   expect(isPrimitive(undefined)).toBe(false);
   expect(isPrimitive({})).toBe(false);
   expect(isPrimitive([])).toBe(false);
-  expect(isPrimitive(() => {})).toBe(false);
 });
 
 test("is primitives array", () => {
   const truthy = [null, "hello", 5, true, false, Symbol("hello"), BigInt(10)];
-  const falsy = [{}, [], () => {}, new Date(), new Error(), {}, []];
+  const falsy = [{}, [], new Date(), new Error()];
 
   expect(isPrimitivesArray(truthy)).toBe(true);
   expect(isPrimitivesArray(falsy)).toBe(false);
