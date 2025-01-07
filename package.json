@@ -1,6 +1,6 @@
 {
   "name": "@snuifstuif/open-rpc",
-  "version": "0.3.20",
+  "version": "0.3.21",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Snuifstuif/open-rpc.git"
@@ -17,20 +17,20 @@
   "files": ["dist"],
   "scripts": {
     "build": "bun build ./src/index.ts --outdir ./dist/src --target node --minify-whitespace --minify-syntax --drop=console && bun build:lib && bun build:types",
-    "build:lib": "bun build ./lib/index.ts --outdir ./dist/lib --target node --format cjs --minify --drop=console",
+    "build:lib": "bun build ./lib/index.ts --outdir ./dist/lib --target node --format cjs --minify-whitespace --minify-syntax --drop=console",
     "build:types": "tsc --project ./tsconfig.json",
-    "check": "bun biome check --write ./src ./lib ./tests",
+    "check": "biome check --write ./src ./lib ./tests",
     "prepublishOnly": "bun run check && bun test --coverage && rm -rf dist && bun run build"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
     "@types/bun": "latest",
-    "tinybench": "^3.0.7"
+    "tinybench": "^3.1.0"
   },
   "peerDependencies": {
     "typescript": "^5.5.2"
   },
   "dependencies": {
-    "openapi-typescript": "^7.4.4"
+    "openapi-typescript": "^7.5.2"
   }
 }
