@@ -12,6 +12,7 @@ import type {
   ProxyCallback,
   ProxyCallbackOptions,
   Result,
+  UnionToTuple,
 } from "./types";
 import { unwrapResponse } from "./unwrap";
 import {
@@ -373,7 +374,7 @@ export const createClient =
       options?.generators,
       options?.static,
     ) as Format<
-      Prepare<ApiSpec, ExtractFunctions<ApiSpec>>,
+      Prepare<ApiSpec, ExtractFunctions<UnionToTuple<ApiSpec>>>,
       GetResponseFormat<TMiddleware>,
       TransformResponse
     > &

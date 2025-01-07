@@ -130,7 +130,7 @@ export type UnionToTuple<T, Last = LastInUnion<T>> = [T] extends [never]
   ? []
   : [Last, ...UnionToTuple<Exclude<T, Last>>];
 
-export type ExtractFunctions<T> = UnionToTuple<T> extends [
+export type ExtractFunctions<T> = T extends [
   (...args: infer P) => infer R,
   ...infer Rest,
 ]
